@@ -1,0 +1,29 @@
+# maven specific
+target/
+**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.restore
+release.properties
+
+# settings IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+/out/
+
+# Eclipse та VS Code
+.classpath
+.project
+.settings/
+.vscode/
+.factorypath
+
+# system files
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
