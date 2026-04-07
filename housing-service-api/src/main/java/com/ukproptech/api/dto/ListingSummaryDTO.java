@@ -13,6 +13,7 @@ public record ListingSummaryDTO(
         String postcode,
         BigDecimal price,
         PropertyType propertyType,
-        Double rentYield,      // Розраховано через Batch Job (DDIA Chapter 10)
-        Integer commuteMinutes // Отримано через інтеграцію з TfL API
-) {}
+        Double rentYield,      // Calculated from Batch Job (DDIA Chapter 10)
+        Integer commuteMinutes
+) {
+}

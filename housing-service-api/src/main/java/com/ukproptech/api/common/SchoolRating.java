@@ -1,33 +1,31 @@
 package com.ukproptech.api.common;
 
 /**
- * Офіційний рейтинг шкіл Великої Британії за системою Ofsted.
- * Використовується для аналітики районів (Area Analytics)
- * та прийняття рішень про релокацію.
+ * Ofsted school ratings, used to indicate the quality of schools in a given area.
  */
 public enum SchoolRating {
     /**
-     * Outstanding (Найвища оцінка): Школа демонструє виняткові результати.
+     * Outstanding
      */
     OUTSTANDING,
 
     /**
-     * Good (Добре): Школа працює на належному рівні.
+     * Good
      */
     GOOD,
 
     /**
-     * Requires Improvement (Потребує вдосконалення): Школа не відповідає всім стандартам.
+     * Requires Improvement
      */
     REQUIRES_IMPROVEMENT,
 
     /**
-     * Inadequate (Недостатньо): Школа має серйозні недоліки.
+     * Inadequate
      */
     INADEQUATE,
 
     /**
-     * Unknown/Pending: Якщо дані про школу ще не доступні або очікується перевірка.
+     * Unknown/Pending
      */
     UNKNOWN
 }
