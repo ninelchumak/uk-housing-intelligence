@@ -35,6 +35,6 @@ Inspired by **"Designing Data-Intensive Applications" (DDIA)** by Martin Kleppma
 
 ### Installation & Build
 ```bash
-git clone [https://github.com/your-username/uk-housing-intelligence.git](https://github.com/your-username/uk-housing-intelligence.git)
+git clone [https://github.com/ninelchumak/uk-housing-intelligence.git](https://github.com/ninelchumak/uk-housing-intelligence.git)
 cd uk-housing-intelligence
 mvn clean install
