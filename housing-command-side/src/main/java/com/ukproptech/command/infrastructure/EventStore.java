@@ -1,25 +1,24 @@
 package com.ukproptech.command.infrastructure;
 
-
 import java.util.List;
 
-/**
- * Interface for an event store that persists and retrieves events.
- */
 public interface EventStore {
 
     /**
-     * Saves an event to the store.
+     * Persists a list of events to the store after verifying the aggregate's version.
      *
-     * @param event the event to save
+     * @param aggregateId     The unique identifier of the property.
+     * @param expectedVersion The version that the application state was based on.
+     * @param events          The new events to be appended to the stream.
+     * @throws com.ukproptech.command.exceptions.ConcurrencyException if versions mismatch.
      */
-    void save(Object event);
+    void saveEvents(String aggregateId, long expectedVersion, List<Object> events);
 
     /**
-     * Retrieves all events for a given aggregate ID.
+     * Retrieves the entire event stream for a specific aggregate to reconstruct its state.
      *
-     * @param aggregateId the ID of the aggregate
-     * @return a list of events for the aggregate
+     * @param aggregateId The unique identifier of the property.
+     * @return A list of historical events in chronological order.
      */
     List<Object> getEvents(String aggregateId);
 }

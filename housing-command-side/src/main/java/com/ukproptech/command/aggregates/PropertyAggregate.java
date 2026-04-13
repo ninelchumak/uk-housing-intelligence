@@ -1,8 +1,8 @@
 package com.ukproptech.command.aggregates;
 
 import com.ukproptech.api.common.PropertyType;
-import com.ukproptech.api.events.ListingCreatedEvent;
 import com.ukproptech.api.events.PriceChangedEvent;
+import com.ukproptech.api.events.PropertyCreatedEvent;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * Represents the aggregate root for a property listing.
- * Maintains the current state and applies changes only through events.
+ * Maintains the current state and applies changes only through versioned events.
  */
 public class PropertyAggregate {
 
@@ -20,13 +20,19 @@ public class PropertyAggregate {
     private String postcode;
     private BigDecimal price;
     private PropertyType propertyType;
+    private long version = 0; // Tracks the current version of the aggregate
 
     public PropertyAggregate() {
-        // Default constructor for rehydration
+        // Default constructor for rehydration from history
     }
 
+    /**
+     * Constructor for creating a brand new Property.
+     * Initial version is always 1.
+     */
     public PropertyAggregate(String id, String postcode, BigDecimal price, PropertyType propertyType) {
-        applyChange(new ListingCreatedEvent(id, postcode, price, propertyType, Instant.now()));
+        // Version 1 is assigned upon creation
+        applyChange(new PropertyCreatedEvent(id, postcode, price, propertyType, Instant.now(), 1));
     }
 
     /**
@@ -39,73 +45,73 @@ public class PropertyAggregate {
             throw new IllegalArgumentException("Price must be greater than zero.");
         }
         if (newPrice.equals(this.price)) {
-            return; // No change
+            return; // No change, no event generated
         }
 
-        applyChange(new PriceChangedEvent(this.id, this.price, newPrice, Instant.now()));
+        // New version is always current version + 1
+        applyChange(new PriceChangedEvent(
+                this.id,
+                this.price,
+                newPrice,
+                Instant.now(),
+                this.version + 1
+        ));
     }
 
     /**
-     * Applies a change and adds the event to the list of uncommitted changes.
-     *
-     * @param event the event to apply
+     * Handles event application and tracks uncommitted changes.
      */
     private void applyChange(Object event) {
-        if (event instanceof ListingCreatedEvent listingCreatedEvent) {
-            apply(listingCreatedEvent);
-        } else if (event instanceof PriceChangedEvent priceChangedEvent) {
-            apply(priceChangedEvent);
-        }
+        apply(event);
         changes.add(event);
     }
 
+    /**
+     * Restores the aggregate state from a list of historical events.
+     * Use this during the "Rehydration" process.
+     */
     public void handleFromHistory(Object event) {
+        if (event == null) throw new IllegalArgumentException("Event cannot be null");
+        apply(event);
+    }
+
+    /**
+     * Internal dispatcher to route events to specific apply methods.
+     * This keeps the state mutation logic clean and separated.
+     */
+    private void apply(Object event) {
         switch (event) {
-            case ListingCreatedEvent e -> apply(e);
-            case PriceChangedEvent e -> apply(e);
-            case null -> throw new IllegalArgumentException("Event cannot be null");
+            case PropertyCreatedEvent e -> applyInternal(e);
+            case PriceChangedEvent e -> applyInternal(e);
             default -> System.out.println("Unknown event type: " + event.getClass());
         }
     }
 
-    /**
-     * Applies a ListingCreatedEvent to initialize the aggregate state.
-     *
-     * @param event the event to apply
-     */
-    private void apply(ListingCreatedEvent event) {
+    private void applyInternal(PropertyCreatedEvent event) {
         this.id = event.id();
         this.postcode = event.postcode();
         this.price = event.price();
-        this.propertyType = event.propertyType();
+        this.propertyType = event.type();
+        this.version = event.version(); // Syncing aggregate version with event
     }
 
-    /**
-     * Applies a PriceChangedEvent to update the aggregate state.
-     *
-     * @param event the event to apply
-     */
-    private void apply(PriceChangedEvent event) {
+    private void applyInternal(PriceChangedEvent event) {
         this.price = event.newPrice();
+        this.version = event.version(); // Syncing aggregate version with event
     }
 
     /**
-     * Returns the list of uncommitted changes.
-     *
-     * @return the list of uncommitted events
+     * Returns uncommitted changes that need to be persisted to the Event Store.
      */
     public List<Object> getChanges() {
         return new ArrayList<>(changes);
     }
 
-    /**
-     * Clears the list of uncommitted changes.
-     */
     public void clearChanges() {
         changes.clear();
     }
 
-    // Getters for the current state
+    // Getters
     public String getId() {
         return id;
     }
@@ -120,5 +126,9 @@ public class PropertyAggregate {
 
     public PropertyType getPropertyType() {
         return propertyType;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

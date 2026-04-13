@@ -16,14 +16,17 @@ public class ListingRepositoryImpl implements ListingRepository {
     }
 
     @Override
-    public void save(PropertyAggregate property) {
-        List<Object> uncommittedChanges = property.getChanges();
+    public void save(PropertyAggregate aggregate) {
+        // We calculate expected version as current version minus number of new changes
+        long expectedVersion = aggregate.getVersion() - aggregate.getChanges().size();
 
-        for (Object event : uncommittedChanges) {
-            eventStore.save(event);
-        }
+        eventStore.saveEvents(
+                aggregate.getId(),
+                expectedVersion,
+                aggregate.getChanges()
+        );
 
-        property.clearChanges();
+        aggregate.clearChanges();
     }
 
     @Override

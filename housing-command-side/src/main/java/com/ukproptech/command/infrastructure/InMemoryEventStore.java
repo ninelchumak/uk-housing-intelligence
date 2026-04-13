@@ -1,44 +1,44 @@
 package com.ukproptech.command.infrastructure;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.ukproptech.api.commands.exceptions.ConcurrencyException;
+import com.ukproptech.api.infrastructure.EventBus;
 
-/**
- * In-memory implementation of the EventStore interface.
- * Suitable for testing and development purposes.
- */
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class InMemoryEventStore implements EventStore {
+    // Map of aggregateId -> List of events
+    private final Map<String, List<Object>> store = new ConcurrentHashMap<>();
+    private final EventBus eventBus;
 
-    private final Map<String, List<Object>> eventStore = new HashMap<>();
-
-    @Override
-    public void save(Object event) {
-        // Extract the aggregate ID from the event
-        String aggregateId = extractAggregateId(event);
-
-        // Add the event to the store
-        eventStore.computeIfAbsent(aggregateId, id -> new ArrayList<>()).add(event);
-    }
-
-    @Override
-    public List<Object> getEvents(String aggregateId) {
-        return eventStore.getOrDefault(aggregateId, new ArrayList<>());
+    public InMemoryEventStore(EventBus eventBus) {
+        this.eventBus = eventBus;
     }
 
     /**
-     * Extracts the aggregate ID from an event.
-     * Assumes the event has a method `id()` to retrieve the aggregate ID.
-     *
-     * @param event the event
-     * @return the aggregate ID
+     * Saves events to the store with version checking.
+     * * @param aggregateId id of the property
+     * @param expectedVersion the version the aggregate had BEFORE adding new events
+     * @param newEvents list of events to append
      */
-    private String extractAggregateId(Object event) {
-        try {
-            return (String) event.getClass().getMethod("id").invoke(event);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to extract aggregate ID from event", e);
+    public void saveEvents(String aggregateId, long expectedVersion, List<Object> newEvents) {
+        List<Object> eventStream = store.getOrDefault(aggregateId, new ArrayList<>());
+
+        // Check if the current version in store matches what the aggregate expected
+        long currentVersion = eventStream.size();
+        if (currentVersion != expectedVersion) {
+            throw new ConcurrencyException(
+                    "Conflict detected! Expected version " + expectedVersion + " but store has " + currentVersion
+            );
         }
+
+        // Append new events
+        eventStream.addAll(newEvents);
+        store.put(aggregateId, eventStream);
+        newEvents.forEach(eventBus::publish);
+    }
+
+    public List<Object> getEvents(String aggregateId) {
+        return store.getOrDefault(aggregateId, Collections.emptyList());
     }
 }
