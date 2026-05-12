@@ -75,6 +75,12 @@ public class PropertyAggregate {
         apply(event);
     }
 
+    public static PropertyAggregate createFromHistory(List<Object> history) {
+        PropertyAggregate aggregate = new PropertyAggregate();
+        history.forEach(aggregate::handleFromHistory);
+        return aggregate;
+    }
+
     /**
      * Internal dispatcher to route events to specific apply methods.
      * This keeps the state mutation logic clean and separated.

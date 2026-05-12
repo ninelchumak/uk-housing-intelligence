@@ -11,12 +11,14 @@ import com.ukproptech.api.infrastructure.EventBus;
 import com.ukproptech.command.aggregates.PropertyAggregate;
 import com.ukproptech.command.handlers.CreateListingCommandHandler;
 import com.ukproptech.command.handlers.UpdatePriceCommandHandler;
+import com.ukproptech.command.infrastructure.FileEventStore;
 import com.ukproptech.command.infrastructure.InMemoryEventBus;
 import com.ukproptech.command.infrastructure.InMemoryEventStore;
 import com.ukproptech.command.repositories.ListingRepository;
 import com.ukproptech.command.repositories.impl.ListingRepositoryImpl;
 import com.ukproptech.query.jobs.CommuteTimeBatchJob;
 import com.ukproptech.query.projections.PropertyProjection;
+import com.ukproptech.query.repositories.JsonFileListingRepository;
 import com.ukproptech.query.repositories.ListingQueryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +29,7 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class E2EIntegrationTest {
-    private InMemoryEventStore eventStore;
+    private FileEventStore eventStore;
     private ListingRepository repository;
     private CreateListingCommandHandler createHandler;
     private UpdatePriceCommandHandler updateHandler;
@@ -38,13 +40,14 @@ public class E2EIntegrationTest {
     @BeforeEach
     void setUp() {
         eventBus = new InMemoryEventBus();
-        eventStore = new InMemoryEventStore(eventBus);
+        eventStore = new FileEventStore(eventBus);
+        eventStore.clear(); // Now every test starts with a fresh file
 
         repository = new ListingRepositoryImpl(eventStore);
         createHandler = new CreateListingCommandHandler(repository);
         updateHandler = new UpdatePriceCommandHandler(repository);
 
-        queryRepository = new ListingQueryRepository();
+        queryRepository = new JsonFileListingRepository();
         projection = new PropertyProjection(queryRepository);
 
         eventBus.subscribe(PropertyCreatedEvent.class, projection::on);
@@ -138,5 +141,41 @@ public class E2EIntegrationTest {
         createHandler.handle(new CreateListingCommand(propId, "NW1", new BigDecimal("800000"), PropertyType.FLAT));
 
         assertTrue(queryRepository.findById(propId).isPresent());
+    }
+
+    @Test
+    @DisplayName("Should handle long event stream and persist 10+ events in log")
+    void shouldHandleLongEventStream() {
+        String propId = "dynamic-price-prop";
+        BigDecimal initialPrice = new BigDecimal("100000");
+
+        // 1. Initial creation (Event #1)
+        createHandler.handle(new CreateListingCommand(propId, "E14", initialPrice, PropertyType.HOUSE));
+
+        // 2. Perform 9 subsequent updates (Events #2 to #10)
+        // This simulates a bidding war or dynamic market updates
+        for (int i = 1; i <= 9; i++) {
+            BigDecimal updatedPrice = initialPrice.add(new BigDecimal(i * 10000));
+            updateHandler.handle(new UpdatePriceCommand(propId, updatedPrice));
+        }
+
+        // 3. ASSERT: Verify physical storage
+        assertEquals(10, eventStore.getEvents(propId).size(),
+                "Event store should contain exactly 10 events for this property");
+
+        // 4. ASSERT: Verify Rehydration (State recovery from 10 events)
+        PropertyAggregate restored = repository.findById(propId)
+                .orElseThrow(() -> new AssertionError("Aggregate should be restorable from long history"));
+
+        BigDecimal finalExpectedPrice = initialPrice.add(new BigDecimal("90000")); // 100k + 90k
+
+        assertAll("Verify state after 10 events",
+                () -> assertEquals(10, restored.getVersion(), "Aggregate version should be 10"),
+                () -> assertEquals(finalExpectedPrice, restored.getPrice(), "Final price should be correctly calculated"),
+                () -> assertEquals("E14", restored.getPostcode(), "Original data should still be intact")
+        );
+
+        // Optional: Print to console so you can see it in the log file
+        System.out.println("History for " + propId + " successfully written to events.log (10 entries)");
     }
 }

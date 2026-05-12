@@ -31,20 +31,11 @@ public class ListingRepositoryImpl implements ListingRepository {
 
     @Override
     public Optional<PropertyAggregate> findById(String id) {
-        List<Object> eventHistory = eventStore.getEvents(id);
+        List<Object> history = eventStore.getEvents(id);
 
-        if (eventHistory.isEmpty()) {
-            return Optional.empty();
-        }
-
-        PropertyAggregate property = new PropertyAggregate();
-
-        // Rehydration
-        for (Object event : eventHistory) {
-            property.handleFromHistory(event);
-        }
-
-        return Optional.of(property);
+        return history.isEmpty()
+                ? Optional.empty()
+                : Optional.of(PropertyAggregate.createFromHistory(history));
     }
 
     @Override

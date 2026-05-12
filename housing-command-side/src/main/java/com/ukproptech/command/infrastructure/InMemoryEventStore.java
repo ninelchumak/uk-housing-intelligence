@@ -22,19 +22,18 @@ public class InMemoryEventStore implements EventStore {
      * @param newEvents list of events to append
      */
     public void saveEvents(String aggregateId, long expectedVersion, List<Object> newEvents) {
-        List<Object> eventStream = store.getOrDefault(aggregateId, new ArrayList<>());
+        store.compute(aggregateId, (id, eventStream) -> {
+            List<Object> currentStream = (eventStream == null) ? new ArrayList<>() : eventStream;
 
-        // Check if the current version in store matches what the aggregate expected
-        long currentVersion = eventStream.size();
-        if (currentVersion != expectedVersion) {
-            throw new ConcurrencyException(
-                    "Conflict detected! Expected version " + expectedVersion + " but store has " + currentVersion
-            );
-        }
-
-        // Append new events
-        eventStream.addAll(newEvents);
-        store.put(aggregateId, eventStream);
+            long currentVersion = currentStream.size();
+            if (currentVersion != expectedVersion) {
+                throw new ConcurrencyException(
+                        "Conflict detected! Expected version " + expectedVersion + " but store has " + currentVersion
+                );
+            }
+            currentStream.addAll(newEvents);
+            return currentStream;
+        });
         newEvents.forEach(eventBus::publish);
     }
 

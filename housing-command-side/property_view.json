@@ -1,0 +1,8 @@
+[ {
+  "id" : "bus-123",
+  "postcode" : "NW1",
+  "price" : 800000,
+  "propertyType" : "FLAT",
+  "rentYield" : 0.0,
+  "commuteMinutes" : 0
+} ]
